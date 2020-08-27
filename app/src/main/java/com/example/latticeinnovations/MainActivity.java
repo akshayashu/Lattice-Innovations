@@ -34,6 +34,7 @@ import com.google.android.gms.maps.OnMapReadyCallback;
 import com.google.android.gms.maps.SupportMapFragment;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.MarkerOptions;
+import com.hbb20.CountryCodePicker;
 
 import java.io.IOException;
 import java.util.List;
@@ -48,6 +49,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
     //Views
     EditText password, username, email, phoneNo, address;
     TextView setCurrent, location, signInBtn;
+    CountryCodePicker countryCodePicker;
     ImageView passwordCheck, logo;
     String check = "show";
 
@@ -265,8 +267,8 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
 
             @Override
             public void onTextChanged(CharSequence charSequence, int i, int i1, int i2) {
-                phoneNoStr = charSequence.toString().trim();
-                Pattern pattern1 = Pattern.compile("^\\+[0-9]{10,13}$");
+                phoneNoStr = "+" + countryCodePicker.getDefaultCountryCode() + " " + charSequence.toString().trim();
+                Pattern pattern1 = Pattern.compile("^[0-9]{8,11}$");
                 Matcher matcher1 = pattern1.matcher(charSequence.toString().trim());
                 checkFields[4] = matcher1.matches();
                 Log.d("Check5", String.valueOf(checkFields[4]));
@@ -294,12 +296,13 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
     private void init() {
         username = findViewById(R.id.username);
         email = findViewById(R.id.email);
-        phoneNo = findViewById(R.id.phoneNo);
+        phoneNo = findViewById(R.id.phone);
         address = findViewById(R.id.address);
         password = findViewById(R.id.password);
         passwordCheck = findViewById(R.id.passwordCheck);
         signInBtn = findViewById(R.id.signInBtn);
         logo = findViewById(R.id.imageView);
+        countryCodePicker = findViewById(R.id.countryCodeHolder);
 
         location = findViewById(R.id.location);
         setCurrent = findViewById(R.id.setCurrent);

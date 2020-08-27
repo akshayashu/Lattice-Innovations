@@ -52,4 +52,6 @@ dependencies {
     compileOnly 'javax.annotation:jsr250-api:1.0'
     implementation 'javax.inject:javax.inject:1'
 
+    implementation 'com.hbb20:ccp:1.7.2'
+
 }
