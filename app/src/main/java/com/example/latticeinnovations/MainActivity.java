@@ -4,8 +4,11 @@ import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
+import androidx.room.Room;
+import androidx.room.RoomDatabase;
 
 import android.Manifest;
+import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.location.Address;
 import android.location.Geocoder;
@@ -23,6 +26,8 @@ import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.example.latticeinnovations.RoomDB.UserDB;
+import com.example.latticeinnovations.RoomDB.UserEntity;
 import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.OnMapReadyCallback;
@@ -36,37 +41,146 @@ import java.util.Locale;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import static io.reactivex.internal.schedulers.SchedulerPoolFactory.start;
+
 public class MainActivity extends AppCompatActivity implements OnMapReadyCallback {
 
+    //Views
     EditText password, username, email, phoneNo, address;
-    TextView location, markCurrentLocation, signInBtn;
-    ImageView passwordCheck;
+    TextView setCurrent, location, signInBtn;
+    ImageView passwordCheck, logo;
     String check = "show";
+
+    //GoogleMap
     SupportMapFragment supportMapFragment;
     GoogleMap map;
 
-    Location gps_loc = null, network_loc = null, final_loc = null;
-    double longitude = 0.0, latitude = 0.0;
+    //Location variables
+    LocationManager locationManager;
+    Location gps_loc = null,
+            network_loc = null,
+            final_loc = null;
+    double longitude = 0.0,
+            latitude = 0.0;
     String zone, state;
 
+    //Condition variables
     String name, emailStr, phoneNoStr, addressStr, passwordStr;
-
-    boolean check1 = false, check2 = false, check3 = false, check4 = false, check5 = false;
+    boolean[] checkFields = {false,false,false,false,false,false};
 
     String[] permission = {
             Manifest.permission.ACCESS_FINE_LOCATION,
             Manifest.permission.ACCESS_COARSE_LOCATION
     };
-    LocationManager locationManager;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        locationManager = (LocationManager) getSystemService( LOCATION_SERVICE);
+        final UserDB db = Room.databaseBuilder(getApplicationContext(), UserDB.class, "userDB").build();
 
         init();
+        checkFields();
+
+        locationManager = (LocationManager) getSystemService( LOCATION_SERVICE);
+
+        signInBtn.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                Runnable runnable = new Runnable() {
+                    @Override
+                    public void run() {
+                        UserEntity userEntity = new UserEntity(emailStr, name, passwordStr, phoneNoStr, addressStr);
+                        try {
+                            db.userDAO().saveUser(userEntity);
+
+                        } catch (Exception e) {
+                            Log.d("STARTING ERROR", e.getLocalizedMessage());
+                        }
+                    }
+                };
+                Thread thread = new Thread(runnable);
+                thread.start();
+                startActivity(new Intent(getApplicationContext(), UserList.class));
+            }
+        });
+
+        passwordCheck.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                switch (check){
+                    case "show": passwordCheck.setImageResource(R.drawable.eye_show);
+                    password.setTransformationMethod(HideReturnsTransformationMethod.getInstance());
+                    check = "hide";
+                    break;
+
+                    case  "hide": passwordCheck.setImageResource(R.drawable.eye_hide);
+                    password.setTransformationMethod(PasswordTransformationMethod.getInstance());
+                    check = "show";
+                    break;
+                }
+            }
+        });
+
+        logo.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                startActivity(new Intent(getApplicationContext(), UserList.class));
+            }
+        });
+    }
+
+    @Override
+    public void onMapReady(GoogleMap googleMap) {
         askPermission();
+        map = googleMap;
+
+        final LatLng[] curLocation = new LatLng[1];
+
+        if (latitude == 0.0 && longitude == 0.0) {
+            curLocation[0] = new LatLng(29.447831, 77.032995);
+        }else {
+            curLocation[0] = new LatLng(latitude,longitude);
+            Log.d("LOCATION",latitude +","+ longitude);
+        }
+
+        map.clear();
+        map.addMarker(new MarkerOptions().position(curLocation[0]));
+        map.animateCamera(CameraUpdateFactory.newLatLngZoom(curLocation[0], 10.0f));
+
+        setCurrent.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                askPermission();
+                if (latitude == 0.0 && longitude == 0.0) {
+                    curLocation[0] = new LatLng(29.447831, 77.032995);
+                }else {
+                    curLocation[0] = new LatLng(latitude,longitude);
+                    Log.d("LOCATION",latitude +","+ longitude);
+                }
+                map.clear();
+                map.addMarker(new MarkerOptions().position(curLocation[0]));
+                map.animateCamera(CameraUpdateFactory.newLatLngZoom(curLocation[0], 10.0f));
+
+            }
+        });
+
+        map.setOnMapClickListener(new GoogleMap.OnMapClickListener() {
+            @Override
+            public void onMapClick(LatLng latLng) {
+                curLocation[0] = latLng;
+                getLocationAddress(latLng.latitude, latLng.longitude);
+                map.clear();
+                map.addMarker(new MarkerOptions().position(curLocation[0]));
+                map.animateCamera(CameraUpdateFactory.newLatLngZoom(curLocation[0], 12.0f));
+            }
+        });
+    }
+
+    //Conditions for SignUp button to be visible
+    private void checkFields() {
+
         username.addTextChangedListener(new TextWatcher() {
             @Override
             public void beforeTextChanged(CharSequence charSequence, int i, int i1, int i2) {
@@ -76,8 +190,8 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
             @Override
             public void onTextChanged(CharSequence charSequence, int i, int i1, int i2) {
                 name = charSequence.toString().trim();
-                check1 = charSequence.toString().trim().length() > 3;
-                Log.d("Check1", String.valueOf(check1));
+                checkFields[0] = charSequence.toString().trim().length() > 3;
+                Log.d("Check1", String.valueOf(checkFields[0]));
             }
 
             @Override
@@ -96,8 +210,8 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
                 emailStr = charSequence.toString();
                 Pattern pattern1 = Pattern.compile("^([a-zA-Z0-9_.-])+@([a-zA-Z0-9_.-])+\\.([a-zA-Z])+([a-zA-Z])+");
                 Matcher matcher1 = pattern1.matcher(charSequence.toString().trim());
-                check2 = matcher1.matches();
-                Log.d("Check2", String.valueOf(check2));
+                checkFields[1] = matcher1.matches();
+                Log.d("Check2", String.valueOf(checkFields[1]));
             }
 
             @Override
@@ -114,8 +228,8 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
             @Override
             public void onTextChanged(CharSequence charSequence, int i, int i1, int i2) {
                 addressStr = charSequence.toString().trim();
-                check3 = charSequence.toString().trim().length() > 9;
-                Log.d("Check3", String.valueOf(check3));
+                checkFields[2] = charSequence.toString().trim().length() > 9;
+                Log.d("Check3", String.valueOf(checkFields[2]));
             }
 
             @Override
@@ -134,8 +248,8 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
                 passwordStr = charSequence.toString().trim();
                 Pattern pattern1 = Pattern.compile("^(?=.*[0-9])(?=.*[a-z])(?=.*[A-Z]).{8,15}");
                 Matcher matcher1 = pattern1.matcher(charSequence.toString().trim());
-                check4 = matcher1.matches();
-                Log.d("Check4", String.valueOf(check4));
+                checkFields[3] = matcher1.matches();
+                Log.d("Check4", String.valueOf(checkFields[3]));
             }
 
             @Override
@@ -154,8 +268,8 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
                 phoneNoStr = charSequence.toString().trim();
                 Pattern pattern1 = Pattern.compile("^\\+[0-9]{10,13}$");
                 Matcher matcher1 = pattern1.matcher(charSequence.toString().trim());
-                check5 = matcher1.matches();
-                Log.d("Check5", String.valueOf(check5));
+                checkFields[4] = matcher1.matches();
+                Log.d("Check5", String.valueOf(checkFields[4]));
             }
 
             @Override
@@ -163,31 +277,38 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
                 checkConditions();
             }
         });
-
-        markCurrentLocation.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                askPermission();
-            }
-        });
-        passwordCheck.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                switch (check){
-                    case "show": passwordCheck.setImageResource(R.drawable.eye_show);
-                    password.setTransformationMethod(HideReturnsTransformationMethod.getInstance());
-                    check = "hide";
-                    break;
-
-                    case  "hide": passwordCheck.setImageResource(R.drawable.eye_hide);
-                    password.setTransformationMethod(PasswordTransformationMethod.getInstance());
-                    check = "show";
-                    break;
-                }
-            }
-        });
     }
 
+    //Validating SignUp button
+    private void checkConditions() {
+        if(checkFields[0] && checkFields[1] && checkFields[2] && checkFields[3] && checkFields[4]){
+            signInBtn.setVisibility(View.VISIBLE);
+            Log.d("CHECKING", "Visible");
+        } else {
+            signInBtn.setVisibility(View.GONE);
+            Log.d("CHECKING", "InVisible");
+        }
+    }
+
+    //initialising Views
+    private void init() {
+        username = findViewById(R.id.username);
+        email = findViewById(R.id.email);
+        phoneNo = findViewById(R.id.phoneNo);
+        address = findViewById(R.id.address);
+        password = findViewById(R.id.password);
+        passwordCheck = findViewById(R.id.passwordCheck);
+        signInBtn = findViewById(R.id.signInBtn);
+        logo = findViewById(R.id.imageView);
+
+        location = findViewById(R.id.location);
+        setCurrent = findViewById(R.id.setCurrent);
+
+        supportMapFragment = (SupportMapFragment) getSupportFragmentManager().findFragmentById(R.id.map_view);
+        supportMapFragment.getMapAsync(this);
+    }
+
+    //Asking location-access Permission
     private void askPermission() {
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED &&
                 ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
@@ -200,12 +321,13 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         try {
             gps_loc = locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER);
             network_loc = locationManager.getLastKnownLocation(LocationManager.NETWORK_PROVIDER);
+            getLocation();
         } catch ( Exception e){
             Log.d("Location status", e.getLocalizedMessage());
         }
-        getLocation();
     }
 
+    //Acquiring latitude and longitude
     private void getLocation(){
 
         if(gps_loc != null) {
@@ -224,6 +346,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         getLocationAddress(latitude, longitude);
     }
 
+    //Getting Location String
     private void getLocationAddress(double lat, double lon){
         try {
             Geocoder geoCoder = new Geocoder(this, Locale.getDefault());
@@ -245,59 +368,6 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         } catch (Exception e) {
             e.printStackTrace();
         }
-    }
-
-    private void checkConditions() {
-        if(check1 && check2 && check3 && check4 && check5){
-            signInBtn.setVisibility(View.VISIBLE);
-            Log.d("CHECKING", "Visible");
-        } else {
-            signInBtn.setVisibility(View.INVISIBLE);
-            Log.d("CHECKING", "InVisible");
-        }
-    }
-
-    private void init() {
-        username = findViewById(R.id.username);
-        email = findViewById(R.id.email);
-        phoneNo = findViewById(R.id.phoneNo);
-        address = findViewById(R.id.address);
-        password = findViewById(R.id.password);
-        passwordCheck = findViewById(R.id.passwordCheck);
-        signInBtn = findViewById(R.id.signInBtn);
-
-        location = findViewById(R.id.location);
-        markCurrentLocation = findViewById(R.id.setCurrent);
-
-        supportMapFragment = (SupportMapFragment) getSupportFragmentManager().findFragmentById(R.id.map_view);
-        supportMapFragment.getMapAsync(this);
-    }
-
-    @Override
-    public void onMapReady(GoogleMap googleMap) {
-        map = googleMap;
-
-        final LatLng[] curLocation = new LatLng[1];
-
-        if (latitude == 0.0 && longitude == 0.0) {
-            curLocation[0] = new LatLng(29.447831, 77.032995);
-        }else {
-            curLocation[0] = new LatLng(latitude,longitude);
-            Log.d("LOATION", String.valueOf(latitude)+","+String.valueOf(longitude));
-        }
-        map.addMarker(new MarkerOptions().position(curLocation[0]));
-        map.animateCamera(CameraUpdateFactory.newLatLngZoom(curLocation[0], 10.0f));
-
-        map.setOnMapClickListener(new GoogleMap.OnMapClickListener() {
-            @Override
-            public void onMapClick(LatLng latLng) {
-                curLocation[0] = latLng;
-                getLocationAddress(latLng.latitude, latLng.longitude);
-                map.clear();
-                map.addMarker(new MarkerOptions().position(curLocation[0]));
-                map.animateCamera(CameraUpdateFactory.newLatLngZoom(curLocation[0], 12.0f));
-            }
-        });
     }
 
     @Override
