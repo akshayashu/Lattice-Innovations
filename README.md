@@ -12,11 +12,14 @@
 
 ## Extras
 
-* The app colors scheme is inspired by your website [a link](https://www.thelattice.in/)
+* The app colors scheme is inspired by your [website](https://www.thelattice.in/)
 
 * Library 'com.hbb20:ccp:1.7.2' is used for Country Code feature.
 
 Thank You
+
 Yours Sincerely
+
 Akshay Khanna
-[a link](https://www.linkedin.com/in/akshay-khanna-972280193/)
+
+[LinkedIn Profile](https://www.linkedin.com/in/akshay-khanna-972280193/)
