@@ -156,7 +156,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
             public void onClick(View view) {
                 askPermission();
                 if (latitude == 0.0 && longitude == 0.0) {
-                    curLocation[0] = new LatLng(29.447831, 77.032995);
+                    curLocation[0] = new LatLng(28.527917, 77.281875);
                 }else {
                     curLocation[0] = new LatLng(latitude,longitude);
                     Log.d("LOCATION",latitude +","+ longitude);
